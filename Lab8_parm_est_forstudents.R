@@ -8,17 +8,17 @@ library(flexsurv)
 library(R0)
 
 ####################################################################################
-## Part 1. Estimate the serial inteval for SARS using data from Lipsitch et al. 2003
+## Part 1. Estimate the serial interval for SARS using data from Lipsitch et al. 2003
 ####################################################################################
 ## read in data
 getwd()  ## use "getwd()" to see your current directory and the path
-setwd('YOUR DIRECTORY SAVING THE DATA')
+setwd("/Users/C.K.Cheong/Desktop/Spring 2023/Epi Modeling/Lab/Epi Model Lab 8")
 # Go to Session -> Set Working Directory -> 
 
 
 # alternative method using the file.choose() function
 # da.sars=read.csv(file.choose())
-da.sars=read.csv('SARS_serial_intervals.csv')
+da.sars = read.csv('./Data/SARS_serial_intervals.csv')
 
 # Now take a look at the data
 ## each row is 1 case
@@ -34,46 +34,48 @@ par(mar=c(3,3,1,1),cex=1.2,mgp=c(1.5,.5,0))
 hist(da.sars[,1],breaks=20,col='grey',ylim=c(0,25), main='',
      xlab='Serial Interval (days)',ylab='Number of cases')
 
-## to use the survival function in the package (either flexsurv or survival)
+## to use the survival function in the package (either `flexsurv` or `survival`)
 ## we have to first covert the data to a survival object
 ## to do so, run the command:
-xsurv=Surv(da.sars$tm1,da.sars$tm2,da.sars$event,type='interval')
+xsurv = Surv(da.sars$tm1, da.sars$tm2, da.sars$event, type = 'interval')
 
 ####################################################
 ## EXAMPLE CODE: Fit to the Weibull distribution
 ####################################################
 ## First try the survival function, with a Weibull distribution:
-surv1=flexsurvreg(xsurv~1,dist='weibull')
+surv1 = flexsurvreg(xsurv ~ 1, dist = 'weibull') 
 
 surv1; # check the model output
 surv1$res;  # model parm estimates are save in 'res'
 
-## Calculate the mean based on the estimates
+# lambda = scale; k = shape
+# gamma is a built-in function in R
+
+## Calculate the mean based on the estimates ("est" is the mean estimate)
 ## for Weibull distribution:
-## Check the Weibull distriubtion parameters here:  https://en.wikipedia.org/wiki/Weibull_distribution
-surv1.mean=surv1$res['scale','est']*gamma(1+1/surv1$res['shape','est']); # the mean for weibull
-surv1.sd=sqrt(surv1$res['scale','est']^2*(gamma(1+2/surv1$res['shape','est'])-(gamma(1+1/surv1$res['shape','est']))^2))
-print(paste(round(surv1.mean,1),'+/-',round(surv1.sd,1)))
+## Check the Weibull distribution parameters here:  https://en.wikipedia.org/wiki/Weibull_distribution
+surv1.mean = surv1$res['scale', 'est'] * gamma(1+1/surv1$res['shape', 'est']); # the mean for weibull
+surv1.sd = sqrt(surv1$res['scale', 'est']^2 * (gamma(1+2/surv1$res['shape', 'est']) - (gamma(1+1/surv1$res['shape', 'est']))^2))
+print(paste(round(surv1.mean, 1), '+/-', round(surv1.sd, 1)))
 
 ## Get the AIC:
-surv1.AIC=surv1$AIC
+surv1.AIC = surv1$AIC
 
 ## compute the model fit:
-tm=seq(min(da.sars[,'tm1']),max(da.sars[,'tm2']),by=.2) # more time points than the observed, so we can fill the gap
+# first, we compute more time points than the observed, so we can fill the gap
+tm = seq(min(da.sars[ , 'tm1']), max(da.sars[ , 'tm2']), by = 0.2) 
 # compute the number of cases per the survival model
-# dweibull is the density function for the Weibull distribution
-fit1=nrow(da.sars)*dweibull(tm,scale=surv1$res['scale','est'],
-                            shape=surv1$res['shape','est']);
+# `dweibull` is the density function for the Weibull distribution
+fit1 = nrow(da.sars) * dweibull(tm, scale = surv1$res['scale', 'est'], shape = surv1$res['shape', 'est']);
 
 # Super-impose the model fit on the data for comparison
-par(mar=c(3,3,1,1),cex=1.2,mgp=c(1.5,.5,0))
-hist(da.sars[,1],breaks=20,col='grey',ylim=c(0,25), main='',
-     xlab='Serial Interval (days)',ylab='Number of cases')
-lines(tm,fit1,col='red',lwd=2)
-legend('topright',cex=.9,seg.len = .8,
-       legend=c('Observed','Fitted (Weibull)'),
-       lty=c(0,1),pch=c(22,NA),lwd=c(NA,2),pt.bg = c('grey',NA),
-       col=c('grey','red'),bty='n')
+par(mar = c(3, 3, 1, 1), cex = 1.2, mgp = c(1.5, 0.5, 0))
+hist(da.sars[ , 1], breaks = 20, col = 'grey', ylim = c(0, 25), main = '', xlab = 'Serial Interval (days)', ylab = 'Number of cases')
+lines(tm, fit1, col = 'red', lwd = 2)
+legend('topright', cex = 0.9, seg.len = 0.8,
+       legend = c('Observed', 'Fitted (Weibull)'),
+       lty = c(0, 1), pch = c(22, NA), lwd = c(NA, 2), pt.bg = c('grey', NA),
+       col = c('grey', 'red'), bty = 'n')
 
 
 ####################################################
@@ -109,21 +111,20 @@ legend('topright',cex=.9,seg.len = .8,
 ## Part 2: Estimating R0 from the exponential growth phase of the epidemic
 ####################################################################################
 ## data: daily incidence during 1918 influenza pandemic in Germany (from 'R0' library)
-da.flu=read.csv('data_1918pandemic_Germany.csv')
+da.flu = read.csv('./Data/data_1918pandemic_Germany.csv')
 da.flu$date = as.Date(da.flu$date)  # convert to date
 
 ## Always plot and check the data first
-par(mar=c(3,3,1,1),cex=1.2,mgp=c(1.5,.5,0))
-plot(da.flu[,1],da.flu[,2], xlab='',ylab='Cases', pch = 20)
-
+par(mar = c(3, 3, 1, 1), cex = 1.2, mgp = c(1.5, 0.5, 0))
+plot(da.flu[ , 1], da.flu[ , 2], xlab = 'time', ylab = 'Cases', pch = 20)
 
 
 # [LQ4] Calculate the cumulative incidence using the daily incidence dataset (‘data_1918pandemic_Germany.csv’) and plot the log(cumulative incidence) v. time (0.5pt)
-## Hint: cumpute the cumulative incidence using the cumsum function
-cumI=cumsum(da.flu[,2]); 
+## Hint: compute the cumulative incidence using the `cumsum` function
+cumI = cumsum(da.flu[ , 2]); 
 
 # plot and see:
-
+plot(cumI)
 
 
 # [LQ5] Assume a generation time of 3 days, estimate R0 from the exponential growth phase of the epidemic
@@ -132,14 +133,14 @@ cumI=cumsum(da.flu[,2]);
 
 # EXAMPLE: FOR THE FIRST 7 DAYS
 # Fit to the data during the first 7 days:
-D=3; # set the generation time to 3 days
-Ndays=7;  # ADJUST THE NUMBER OF DAYS INCLUDED IN THE FIT HERE
-tm1=1:Ndays;
-fit1=lm(log(cumI[1:Ndays])~tm1)
+D = 3; # set the generation time to 3 days
+Ndays = 7;  # ADJUST THE NUMBER OF DAYS INCLUDED IN THE FIT HERE
+tm1 = 1:Ndays;
+fit1 = lm(log(cumI[1:Ndays]) ~ tm1) # y = ln(cumI)
 summary(fit1)
 
 # compute R0 based on the model-fit
-R=1+fit1$coefficients[2]*D   # slope: fit1$coefficients[2]
+R = 1 + fit1$coefficients[2] * D   # slope: fit1$coefficients[2] this is the exponential growth rate (r)
 
 
 
@@ -152,7 +153,7 @@ data("Germany.1918") # Request the data (it's from the package)
 Germany.1918 # print the data to see the structure
 
 # First we need the distribution of generation time (i.e. serial interval)
-mGT<-generation.time("gamma", c(2.45, 1.38))
+mGT = generation.time("gamma", c(2.45, 1.38)) # Check lab notes pg.25
 
 
 #  [LQ7] Based on the flu data and the above generation time, 
@@ -164,9 +165,9 @@ mGT<-generation.time("gamma", c(2.45, 1.38))
 # Maximum Likelihood Estimation using the est.R0.ML function
 est.R0.ML(Germany.1918, # the data
           mGT, # the distribution of serial interval
-          begin=1, # the start of the data
-          end=7, # ADJUST THE NUMBER OF DAYS TO INCLUDE IN THE MODEL HERE
-          range=c(0.01,50) # the range of possible values to test
+          begin = 1, # the start of the data
+          end = 7, # ADJUST THE NUMBER OF DAYS TO INCLUDE IN THE MODEL HERE
+          range = c(0.01, 50) # the range of possible values to test
           )
 
 
